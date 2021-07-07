@@ -120,7 +120,7 @@ unsigned char *base64_decode(const unsigned char *src, size_t len, size_t *out_l
 // wave.cpp
 ////////////////////
 
-#define WAVE_LEN 256
+#define WAVE_LEN 2048
 
 enum EffectID {
 	PRE_GAIN,
@@ -154,13 +154,17 @@ struct Wave {
 	float effects[EFFECTS_LEN];
 	bool cycle;
 	bool normalize;
+	bool phasebash;
+	bool zerox;
 
 	void clear();
+	bool isClear();
 	/** Generates post arrays from the sample array, by applying effects */
 	void updatePost();
 	void commitSamples();
 	void commitHarmonics();
 	void clearEffects();
+	void interpolate(int index, int start = -1, int end = -1);
 	/** Applies effects to the sample array and resets the effect parameters */
 	void bakeEffects();
 	void randomizeEffects();
@@ -178,17 +182,28 @@ extern bool clipboardActive;
 // bank.cpp
 ////////////////////
 
-#define BANK_LEN 64
-#define BANK_GRID_WIDTH 8
-#define BANK_GRID_HEIGHT 8
+void setGlobalBankLen(int newLen);
+
+extern int userBankLen; // user specified length, up to BANK_LEN
+extern int bankGridWidth; // 8
+extern int bankGridHeight; // userBankLen / bankGridWidth
+
+#define BANK_LEN_MAX 64
+#define BANK_LEN userBankLen
+#define BANK_GRID_WIDTH bankGridWidth
+#define BANK_GRID_HEIGHT bankGridHeight
 
 struct Bank {
-	Wave waves[BANK_LEN];
+	Wave waves[BANK_LEN_MAX];
+	int bankLen;
+
+	void setBankLen(int newLen);
+	int getBankLen();
 
 	void clear();
 	void swap(int i, int j);
 	void shuffle();
-	/** `in` must be length BANK_LEN * WAVE_LEN */
+	/** `in` must be length getBankLen() * WAVE_LEN */
 	void setSamples(const float *in);
 	void getPostSamples(float *out);
 	void duplicateToAll(int waveId);
@@ -200,6 +215,18 @@ struct Bank {
 	void loadWAV(const char *filename);
 	/** Saves each wave to its own file in a directory */
 	void saveWaves(const char *dirname);
+
+	bool allInCycle();
+	bool allInNormalize();
+	bool allInZerox();
+	bool allInPhaseBash();
+
+	void cycleAll(bool way);
+	void normalizeAll(bool way);
+	void zeroxAll(bool way);
+	void phaseBashAll(bool way);
+
+	Bank() : bankLen{BANK_LEN_MAX} {}
 };
 
 

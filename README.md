@@ -1,6 +1,6 @@
 # Synthesis Technology WaveEdit
 
-The wavetable and bank editor for the Synthesis Technology [E370](http://synthtech.com/eurorack/E370/) and [E352](http://synthtech.com/eurorack/E352/) Eurorack synthesizer modules.
+The wavetable and bank editor for the Synthesis Technology [E370](http://synthtech.com/eurorack/E370/) and [E352](http://synthtech.com/eurorack/E352/) Eurorack synthesizer modules. This version adds support for the KORG Modwave synthesizer's wavetable format.
 
 ### Building
 

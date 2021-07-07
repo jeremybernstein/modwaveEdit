@@ -465,6 +465,18 @@ void renderPreview() {
 	ImGui::SameLine();
 	ImGui::PushItemWidth(300.0);
 	ImGui::SliderFloat("##playVolume", &playVolume, -60.0f, 0.0f, "Volume: %.2f dB");
+
+	ImGui::SameLine();
+	ImGui::PushItemWidth(120.0);
+	int bankLen = currentBank.getBankLen();
+	ImGui::InputInt("Frames", &bankLen);
+	// ImGui::PopItemWidth();
+	bankLen = bankLen < 1 ? 1 : bankLen > BANK_LEN_MAX ? BANK_LEN_MAX : bankLen;
+	if (bankLen != BANK_LEN) {
+		setGlobalBankLen(bankLen);
+		historyPush();
+	}
+
 	ImGui::PushItemWidth(-1.0);
 	ImGui::SameLine();
 	ImGui::SliderFloat("##playFrequency", &playFrequency, 1.0f, 10000.0f, "Frequency: %.2f Hz", 0.0f);
@@ -494,6 +506,7 @@ void renderPreview() {
 
 
 void renderToolSelector(Tool *tool) {
+	ImGui::BeginGroup();
 	if (ImGui::RadioButton("Pencil", *tool == PENCIL_TOOL)) *tool = PENCIL_TOOL;
 	ImGui::SameLine();
 	if (ImGui::RadioButton("Brush", *tool == BRUSH_TOOL)) *tool = BRUSH_TOOL;
@@ -503,6 +516,7 @@ void renderToolSelector(Tool *tool) {
 	if (ImGui::RadioButton("Line", *tool == LINE_TOOL)) *tool = LINE_TOOL;
 	ImGui::SameLine();
 	if (ImGui::RadioButton("Eraser", *tool == ERASER_TOOL)) *tool = ERASER_TOOL;
+	ImGui::EndGroup();
 }
 
 
@@ -540,6 +554,8 @@ void editorPage() {
 		renderToolSelector(&tool);
 
 		ImGui::SameLine();
+		ImGui::BeginGroup();
+		ImGui::Indent();
 		if (ImGui::Button("Clear")) {
 			currentBank.waves[selectedId].clear();
 			historyPush();
@@ -560,6 +576,7 @@ void editorPage() {
 				ImGui::EndPopup();
 			}
 		}
+		ImGui::EndGroup();
 
 		// ImGui::SameLine();
 		// if (ImGui::RadioButton("Smooth", tool == SMOOTH_TOOL)) tool = SMOOTH_TOOL;
@@ -584,6 +601,7 @@ void editorPage() {
 			effectSlider((EffectID) i);
 		}
 
+		ImGui::BeginGroup();
 		if (ImGui::Checkbox("Cycle", &currentBank.waves[selectedId].cycle)) {
 			currentBank.waves[selectedId].updatePost();
 			historyPush();
@@ -608,6 +626,7 @@ void editorPage() {
 			currentBank.waves[selectedId].bakeEffects();
 			historyPush();
 		}
+		ImGui::EndGroup();
 
 		ImGui::PopItemWidth();
 	}
@@ -660,48 +679,121 @@ void effectHistogram(EffectID effect, Tool tool) {
 }
 
 
+static void morphCommonComplete() {
+	for (int i = 0; i < BANK_LEN; i++) {
+		currentBank.waves[i].bakeEffects(); // ... bake here seems to make sense
+		historyPush();
+	}
+}
+
+
+static void morphFullRange() {
+	for (int i = 0; i < BANK_LEN; i++) {
+		currentBank.waves[i].clearEffects(); // clear, followed by ...
+		currentBank.waves[i].interpolate(i);
+	}
+}
+
+
+static void morphNonZero() {
+	struct InterpExtents {
+		int start;
+		int end;
+	};
+
+	std::vector<InterpExtents> extents;
+	int start = 0;
+	for (int i = 0; i < BANK_LEN; i++) {
+		if (!i) continue;
+		if ((i < BANK_LEN - 1) && currentBank.waves[i].isClear()) ;
+		else {
+			extents.push_back({start, i});
+			start = i;
+		}
+	}
+	for (auto it = extents.begin(); it < extents.end(); it++) {
+		auto& e = *it;
+		if (e.end - e.start > 1) {
+			for (int i = e.start; i <= e.end; i++) {
+				currentBank.waves[i].clearEffects(); // clear, followed by ...
+				currentBank.waves[i].interpolate(i, e.start, e.end);
+			}
+		}
+	}
+	morphCommonComplete();
+}
+
+
+static void morphAdjacent() {
+	for (int i = 0; i < BANK_LEN; i++) {
+		currentBank.waves[i].clearEffects(); // clear, followed by ...
+		currentBank.waves[i].interpolate(i, i, i + 1);
+	}
+	morphCommonComplete();
+}
+
+
 void effectPage() {
+	static std::vector<std::string> morphOperations = {
+		"0...N",
+		"Non-zero",
+		"Adjacent"
+	};
+
 	ImGui::BeginChild("Effect Editor", ImVec2(0, 0), true); {
 		static Tool tool = PENCIL_TOOL;
 		renderToolSelector(&tool);
 
-		ImGui::PushItemWidth(-1);
-		for (int i = 0; i < EFFECTS_LEN; i++) {
-			effectHistogram((EffectID) i, tool);
-		}
-		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		ImGui::BeginGroup();
+		ImGui::Indent();
 
-		if (ImGui::Button("Cycle All")) {
-			for (int i = 0; i < BANK_LEN; i++) {
-				currentBank.waves[i].cycle = true;
-				currentBank.waves[i].updatePost();
-				historyPush();
-			}
+		ImGui::TextUnformatted("All: ");
+		ImGui::SameLine();
+		bool cycle = currentBank.allInCycle();
+		if (ImGui::Checkbox("Cycle", &cycle)) {
+			currentBank.cycleAll(cycle);
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Cycle None")) {
-			for (int i = 0; i < BANK_LEN; i++) {
-				currentBank.waves[i].cycle = false;
-				currentBank.waves[i].updatePost();
-				historyPush();
-			}
+		bool normalize = currentBank.allInNormalize();
+		if (ImGui::Checkbox("Normalize", &normalize)) {
+			currentBank.normalizeAll(normalize);
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Normalize All")) {
-			for (int i = 0; i < BANK_LEN; i++) {
-				currentBank.waves[i].normalize = true;
-				currentBank.waves[i].updatePost();
-				historyPush();
-			}
+		bool zerox = currentBank.allInZerox();
+		if (ImGui::Checkbox("Zero-X", &zerox)) {
+			currentBank.zeroxAll(zerox);
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Normalize None")) {
-			for (int i = 0; i < BANK_LEN; i++) {
-				currentBank.waves[i].normalize = false;
-				currentBank.waves[i].updatePost();
-				historyPush();
-			}
+		bool phasebash = currentBank.allInPhaseBash();
+		if (ImGui::Checkbox("Phasebash", &phasebash)) {
+			currentBank.phaseBashAll(phasebash);
 		}
+		ImGui::EndGroup();
+
+		ImGui::SameLine();
+		ImGui::BeginGroup();
+		ImGui::Indent();
+
+		if (ImGui::Button("Morph...")) ImGui::OpenPopup("Morph");
+		if (ImGui::BeginPopup("Morph")) {
+			for (const std::string &morphOperation : morphOperations) {
+				if (ImGui::Selectable(morphOperation.c_str())) {
+					if (morphOperation.compare("0...N") == 0) {
+						morphFullRange();
+					}
+					else if (morphOperation.compare("Non-zero") == 0) {
+						morphNonZero();
+					}
+					else if (morphOperation.compare("Adjacent") == 0) {
+						morphAdjacent();
+					}
+					historyPush();
+				}
+			}
+			ImGui::EndPopup();
+		}
+
 		ImGui::SameLine();
 		if (ImGui::Button("Randomize")) {
 			for (int i = 0; i < BANK_LEN; i++) {
@@ -723,6 +815,13 @@ void effectPage() {
 				historyPush();
 			}
 		}
+		ImGui::EndGroup();
+
+		ImGui::PushItemWidth(-1);
+		for (int i = 0; i < EFFECTS_LEN; i++) {
+			effectHistogram((EffectID) i, tool);
+		}
+		ImGui::PopItemWidth();
 	}
 	ImGui::EndChild();
 }

@@ -46,13 +46,13 @@ int resample(const float *in, int inLen, float *out, int outLen, double ratio) {
 
 
 void cyclicOversample(const float *in, float *out, int len, int oversample) {
-	float x[len * oversample];
-	memset(x, 0, sizeof(x));
+	float *x = new float[len * oversample];
+	memset(x, 0, sizeof(float) * (len * oversample));
 	// Zero-stuff oversampled buffer
 	for (int i = 0; i < len; i++) {
 		x[i * oversample] = in[i] * oversample;
 	}
-	float fft[len * oversample];
+	float *fft = new float[len * oversample];
 	RFFT(x, fft, len * oversample);
 
 	// Apply brick wall filter
@@ -65,6 +65,9 @@ void cyclicOversample(const float *in, float *out, int len, int oversample) {
 	}
 
 	IRFFT(fft, out, len * oversample);
+
+	delete[] fft;
+	delete[] x;
 }
 
 

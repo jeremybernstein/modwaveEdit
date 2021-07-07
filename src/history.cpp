@@ -28,6 +28,7 @@ void historyUndo() {
 		currentIndex--;
 		currentBank = history[currentIndex];
 		previousTime = -INFINITY;
+		setGlobalBankLen(currentBank.getBankLen());
 	}
 }
 
@@ -36,6 +37,7 @@ void historyRedo() {
 		currentIndex++;
 		currentBank = history[currentIndex];
 		previousTime = -INFINITY;
+		setGlobalBankLen(currentBank.getBankLen());
 	}
 }
 

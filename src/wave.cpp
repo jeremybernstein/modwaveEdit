@@ -27,6 +27,20 @@ void Wave::clear() {
 	memset(this, 0, sizeof(Wave));
 }
 
+
+bool Wave::isClear() {
+	for (int i = 0; i < WAVE_LEN; i++) {
+		if (postSamples[i] != 0.) return false;
+	}
+	return true;
+}
+
+
+#define PI 3.14159265358979f
+#define ZEROX_WIDTH 16
+#define FFT_WIDTH (WAVE_LEN / 2)
+
+
 void Wave::updatePost() {
 	float out[WAVE_LEN];
 	memcpy(out, samples, sizeof(float) * WAVE_LEN);
@@ -171,6 +185,74 @@ void Wave::updatePost() {
 		}
 	}
 
+	// Miller Puckette "phase bash" centers phase=0 in the frame
+	// http://msp.ucsd.edu/techniques/v0.11/book-html/node177.html
+	if (phasebash) {
+#if 0
+		float fft[WAVE_LEN];
+		RFFT(out, fft, WAVE_LEN);
+		for (int i = 0; i < WAVE_LEN / 2; i++) {
+			float v = sqrt(fft[2 * i] * fft[2 * i] + fft[2 * i + 1] * fft[2 * i + 1]);
+			v *= i % 2 ? -1. : 1.;
+			//v /= (float)WAVE_LEN / 2;
+			fft[2 * i] = v;
+			fft[2 * i + 1] = 0;
+		}
+		IRFFT(fft, out, WAVE_LEN);
+#else
+		float *tmp = new float[WAVE_LEN]();
+		float *fft = new float[FFT_WIDTH * 2];
+		for (int f = 0; f < WAVE_LEN - (FFT_WIDTH / 2); f += (FFT_WIDTH / 2)) {
+			float *fftmp = new float[FFT_WIDTH * 2](); // zero pad
+			// fill half of the audio buffer, leave 50% for the "tail"
+			for (int i = 0; i < FFT_WIDTH; i++) {
+				fftmp[i] = out[f + i];
+			}
+			RFFT(fftmp, fft, FFT_WIDTH * 2);
+			for (int i = 0; i < FFT_WIDTH; i++) {
+				float v = sqrt((fft[2 * i] * fft[2 * i]) + (fft[2 * i + 1] * fft[2 * i + 1])); // magnitude
+				v *= i % 2 ? -1. : 1.; // alternating signs
+				fft[2 * i] = v;
+				fft[2 * i + 1] = 0;
+			}
+			IRFFT(fft, fftmp, FFT_WIDTH * 2);
+			for (int i = 0; i < FFT_WIDTH * 2; i++) {
+				tmp[i] += fftmp[i];
+			}
+		}
+		for (int i = 0; i < WAVE_LEN; i++) {
+			out[i] = tmp[i] / 3.; // average
+		}
+#endif
+		delete[] fft;
+		delete[] tmp;
+	}
+
+	if (zerox) {
+		// float tmp[WAVE_LEN];
+		for (int i = 0; i < ZEROX_WIDTH; i++) {
+			float position = (float)i / (ZEROX_WIDTH - 1);
+			// float gain1 = cos(position * 0.5 * PI);
+			float gain2 = sin(position * 0.5 * PI);
+
+			out[i] = (out[i] * gain2);// + (out[WAVE_LEN - 1 - i] * gain1);
+			// tmp[i] = (out[i] * gain2) + (out[WAVE_LEN - 1 - i] * gain1);
+		}
+
+		for (int i = WAVE_LEN - ZEROX_WIDTH; i < WAVE_LEN; i++) {
+			float position = (float)((WAVE_LEN - 1) - i) / (ZEROX_WIDTH - 1);
+			// float gain1 = cos(position * 0.5 * PI);
+			float gain2 = sin(position * 0.5 * PI);
+
+			out[i] = (out[i] * gain2);// + (out[(WAVE_LEN - 1) - i] * gain1);
+			// out[i] = (out[i] * gain2) + (out[(WAVE_LEN - 1) - i] * gain1);
+		}
+
+		// for (int i = 0; i < 10; i++) {
+		// 	out[i] = tmp[i];
+		// }
+	}
+
 	// Normalize
 	if (normalize) {
 		float max = -INFINITY;
@@ -181,8 +263,11 @@ void Wave::updatePost() {
 		}
 
 		if (max - min >= 1e-6) {
+			float amin = abs(min);
+			float amax = abs(max);
+			float bigger = amin > amax  ? amin : amax;
 			for (int i = 0; i < WAVE_LEN; i++) {
-				out[i] = rescalef(out[i], min, max, -1.0, 1.0);
+				out[i] = rescalef(out[i], -bigger, bigger, -1.0, 1.0);
 			}
 		}
 		else {
@@ -191,6 +276,63 @@ void Wave::updatePost() {
 	}
 
 	// Hard clip :(
+	for (int i = 0; i < WAVE_LEN; i++) {
+		out[i] = clampf(out[i], -1.0, 1.0);
+	}
+
+	// TODO Fix possible race condition with audio thread here
+	// Or not, because the race condition would only just replace samples as they are being read, which just gives a click sound.
+	memcpy(postSamples, out, sizeof(float)*WAVE_LEN);
+
+	// Convert wave to spectrum
+	RFFT(postSamples, postSpectrum, WAVE_LEN);
+	// Convert spectrum to harmonics
+	for (int i = 0; i < WAVE_LEN / 2; i++) {
+		postHarmonics[i] = hypotf(postSpectrum[2 * i], postSpectrum[2 * i + 1]) * 2.0;
+	}
+}
+
+void Wave::interpolate(int index, int start, int end) {
+	bool fullRange = (start == -1 && end == -1);
+
+	if (fullRange && (index <= 0 || index >= BANK_LEN - 1)) {
+		return;
+	}
+
+	if (fullRange || (end < start)) {
+		start = 0;
+		end = BANK_LEN - 1;
+	}
+
+	int range = end - start;
+	if (!range) return;
+
+	float z = (float)(index - start) / range;
+
+	int s = (start < 0) ? 0 : start;
+	int e = (end > BANK_LEN - 1) ? BANK_LEN - 1 : end;
+
+	float out[WAVE_LEN];
+	if (range > 1) {
+		for (int i = 0; i < WAVE_LEN; i++) {
+			out[i] = crossf(
+				currentBank.waves[s].samples[i],
+				currentBank.waves[e].samples[i],
+				z);
+		}
+	}
+	else {
+		if (index != start) return;
+
+		for (int i = 0; i < WAVE_LEN; i++) {
+			float z2 = (float)i / (WAVE_LEN - 1);
+			out[i] = crossf(
+				currentBank.waves[s].samples[i],
+				currentBank.waves[e].samples[i],
+				z2);
+		}
+	}
+
 	for (int i = 0; i < WAVE_LEN; i++) {
 		out[i] = clampf(out[i], -1.0, 1.0);
 	}
@@ -255,6 +397,8 @@ void Wave::clearEffects() {
 	memset(effects, 0, sizeof(float) * EFFECTS_LEN);
 	cycle = false;
 	normalize = false;
+	zerox = false;
+	phasebash = false;
 	updatePost();
 }
 
@@ -272,9 +416,9 @@ void Wave::randomizeEffects() {
 
 void Wave::saveWAV(const char *filename) {
 	SF_INFO info;
-	info.samplerate = 44100;
+	info.samplerate = 48000;
 	info.channels = 1;
-	info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16 | SF_ENDIAN_LITTLE;
+	info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_32 | SF_FORMAT_FLOAT | SF_ENDIAN_LITTLE;
 	SNDFILE *sf = sf_open(filename, SFM_WRITE, &info);
 	if (!sf)
 		return;

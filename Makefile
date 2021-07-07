@@ -1,4 +1,4 @@
-VERSION = 1.1
+VERSION = MODWAVE_0.2
 
 FLAGS = -Wall -Wextra -Wno-unused-parameter -g -Wno-unused -O3 -march=nocona -ffast-math \
 	-DVERSION=$(VERSION) -DPFFFT_SIMD_DISABLE \
@@ -31,9 +31,9 @@ ifeq ($(ARCH),lin)
 else ifeq ($(ARCH),mac)
 	# Mac
 	FLAGS += -DARCH_MAC \
-		-mmacosx-version-min=10.7
+		-mmacosx-version-min=10.8
 	CXXFLAGS += -stdlib=libc++
-	LDFLAGS += -mmacosx-version-min=10.7 \
+	LDFLAGS += -mmacosx-version-min=10.8 \
 		-stdlib=libc++ -lpthread \
 		-framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo \
 		-Ldep/lib -lSDL2 -lsamplerate -lsndfile -ljansson -lcurl
@@ -81,6 +81,7 @@ dist: WaveEdit
 	cp -R banks dist/WaveEdit
 	cp LICENSE* dist/WaveEdit
 	cp doc/manual.pdf dist/WaveEdit
+	cp releasenotes.txt dist/WaveEdit
 ifeq ($(ARCH),lin)
 	cp -R logo*.png fonts catalog dist/WaveEdit
 	cp WaveEdit WaveEdit.sh dist/WaveEdit

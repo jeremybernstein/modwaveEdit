@@ -67,10 +67,10 @@ html
 
 			In *WaveEdit* and the Synthesis Technology E370 and E352 modules, you can load a bank of wavetables and morph/interpolate between them as they cycle at a particular frequency.
 
-			- A bank contains 64 wavetables
-			- A wavetable contains 256 samples
+			- A bank contains up to 64 wavetables
+			- A wavetable contains 2048 samples
 
-			In Z mode, all 64 wavetables are positioned on a line, and the Z parameter interpolates wavetables from wave 0 to wave 63.
+			In Z mode, all wavetables are positioned on a line, and the Z parameter interpolates wavetables from wave 0 to wave 63.
 			In XY mode, the wavetables are positioned on an 8x8 grid and interpolated in 2D.
 
 			There are several methods for creating a bank of wavetables in *WaveEdit*.
@@ -127,7 +127,7 @@ html
 			Use the **Line** tool to draw a straight line by dragging and the **Erase** tool to set samples and harmonics to zero as you drag across them.
 
 			To the right of the tool selection, you can load a number of preset wavetables from the `catalog/` subfolders.
-			You may customize these presets by adding WAV files with 256 samples to a subfolder in the catalog.
+			You may customize these presets by adding WAV files with 2048 samples to a subfolder in the catalog.
 			You may even create new subfolders, optionally prefixing the filenames with numbers to alphabetically sort them.
 
 			Below the Harmonic display are sliders to adjust the effect amount for the active wavetable.
@@ -221,7 +221,7 @@ html
 			To import an audio file, click **Browse** near the top.
 			Only WAV files can be selected, and they must be a reasonable length, approximately between 32 and 16,000,000 samples
 			Once loaded, the waveform of the audio file will appear in the **Imported Audio Preview** display.
-			The **Bank Preview** displays all 64 consecutive wavetables in the bank.
+			The **Bank Preview** displays all consecutive wavetables in the bank.
 			You can click and drag the Imported Audio Preview and Bank Preview waveforms to re-align the file, resulting in a change to the Offset parameter, explained below.
 			Before importing the file to your current bank, you can modify the following parameters to change the scaling and behavior of the file.
 

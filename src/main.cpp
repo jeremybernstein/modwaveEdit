@@ -88,6 +88,9 @@ int main(int argc, char **argv) {
 	// Main loop
 	bool running = true;
 	while (running) {
+		auto time = SDL_GetTicks();
+		auto delay = 20;
+
 		// Scan events
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
@@ -95,8 +98,14 @@ int main(int argc, char **argv) {
 			if (event.type == SDL_QUIT) {
 				running = false;
 			}
+			// else if (event.type == SDL_MOUSEMOTION || event.type == SDL_KEYDOWN) {
+			// 	delay = 20;
+			// }
 		}
 
+		// if (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)) {
+		// 	delay = 20;
+		// }
 		// Set title
 		const char *title = SDL_GetWindowTitle(window);
 		char newTitle[1024];
@@ -125,6 +134,10 @@ int main(int argc, char **argv) {
 			// Build render buffer
 			uiRender();
 		}
+		if (!(flags & SDL_WINDOW_INPUT_FOCUS || flags & SDL_WINDOW_MOUSE_FOCUS)) {
+			// Throttle if in background
+			delay = 100;
+		}
 
 		// Render frame
 		glViewport(0, 0, (int)ImGui::GetIO().DisplaySize.x, (int)ImGui::GetIO().DisplaySize.y);
@@ -133,6 +146,10 @@ int main(int argc, char **argv) {
 		glClear(GL_COLOR_BUFFER_BIT);
 		ImGui::Render();
 		SDL_GL_SwapWindow(window);
+
+		if ((SDL_GetTicks() - time) < delay) {
+			SDL_Delay(delay);
+		}
 	}
 
 	currentBank.save("autosave.dat");

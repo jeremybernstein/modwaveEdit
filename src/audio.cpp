@@ -29,7 +29,7 @@ long srcCallback(void *cb_data, float **data) {
 	const int inLen = 64;
 	static float in[inLen];
 	for (int i = 0; i < inLen; i++) {
-		if (morphInterpolate) {
+		if (morphInterpolate && BANK_LEN > 1) {
 			const float lambdaMorph = fminf(0.1 / playFrequency, 0.5);
 			morphXSmooth = crossf(morphXSmooth, clampf(morphX, 0.0, BANK_GRID_WIDTH - 1), lambdaMorph);
 			morphYSmooth = crossf(morphYSmooth, clampf(morphY, 0.0, BANK_GRID_HEIGHT - 1), lambdaMorph);
@@ -43,7 +43,7 @@ long srcCallback(void *cb_data, float **data) {
 		}
 
 		int index = (playIndex + i) % WAVE_LEN;
-		if (playModeXY) {
+		if (playModeXY || BANK_LEN <= 1) {
 			// Morph XY
 			int xi = morphXSmooth;
 			float xf = morphXSmooth - xi;
@@ -94,7 +94,7 @@ void audioCallback(void *userdata, Uint8 *stream, int len) {
 		src_callback_read(audioSrc, ratio, outLen, out);
 
 		// Modulate Z
-		if (!playModeXY && morphZSpeed > 0.f) {
+		if (!playModeXY && BANK_LEN > 1 && morphZSpeed > 0.f) {
 			float deltaZ = morphZSpeed * outLen / audioSpec.freq;
 			deltaZ = clampf(deltaZ, 0.f, 1.f);
 			morphZ += (BANK_LEN-1) * deltaZ;
@@ -131,10 +131,10 @@ void audioOpen(int deviceId) {
 
 	SDL_AudioSpec spec;
 	memset(&spec, 0, sizeof(spec));
-	spec.freq = 44100;
+	spec.freq = 48000;
 	spec.format = AUDIO_F32;
 	spec.channels = 1;
-	spec.samples = 1024;
+	spec.samples = 2048;
 	spec.callback = audioCallback;
 
 	const char *deviceName = deviceId >= 0 ? SDL_GetAudioDeviceName(deviceId, 0) : NULL;

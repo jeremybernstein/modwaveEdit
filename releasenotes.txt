@@ -1,0 +1,63 @@
+vMODWAVE_0.2
+============
+
+- New "effect" Phase Bash. This is a technique described by Miller 
+  Puckette (Pd) in his Theory and Technique of Electronic Music
+  (http://msp.ucsd.edu/techniques/v0.11/book-html/node177.html) which
+  uses frequency-domain processing to re-phase audio with the phase 
+  start in the middle of the audio frame. This "phase bashing" creates
+  frames which are significantly more Transwave-compatible, particularly
+  when using normal audio as the wavetable source.
+
+- New "effect" Zero-X, introduces a 16-sample power fade to 0 at the 
+  frame edges. Transwave wavetables are expected to have zero-crossings
+  at the frame boundaries to (help) avoid clicking.
+
+- Normalization could introduce a DC offset, fixed to prevent this.
+
+- Import operation could cause a reduced bank length to reset. Fixed.
+
+- UI adjustments (improvements?) in the Effect Editor pane, now using
+  checkboxes instead of two buttons per "All" operation.
+
+- (macOS): minimum OS version reduced to 10.8 (from 10.11)
+
+- Performance improvements: WaveEdit is written using a game engine
+  application framework and isn't really optimized to do anything
+  but peg 1 processor at 100% when it's open. The current version
+  attempts to throttle processor usage to ~30% when the application
+  is active and much less when it's in the background.
+
+- Variable bank length: you can now set a bank length from 1 to 64
+  frames (of 2048 samples) using the numerical selector at the top
+  of the window.
+
+- Morph...: this new button/popup on the Effect Editor pane provides
+  a few useful wave interpolation options for populating a bank with
+  waves derived from other waves. The current options are:
+
+  - 0...END: interpolate between the wave at frame 0 and the wave at
+    in the last frame (the index depends on the bank length), deleting
+    anything in the middle. The first and last waves remain untouched.
+
+  - Non-zero: interpolate across empty frames, so if you have samples
+    in frames 2, 5, 6 and 9 of a bank with length=11, frames 0 and 1
+    will be interpolated between silence and frame 2, frames 3-4 will
+    be interpolated between frames 2 and 5, and frames 7-8 will be 
+    interpolated between frames 6 and 9. Frames 10-11 will be interpolated
+    back to silence. The non-zero frames remain untouched.
+
+  - Adjacent: interpolate across adjacent frames, similar to the Morph-Z
+    playback interpolation. Frame 0 will be linearly interpolated such that
+    sample 0 is 100% frame 0 and 0% frame 1, sample 127 is 50% frame 0/
+    50% frame 1, and sample 255 is 0% frame 0/100% frame 1. Only the
+    final frame remains untouched.
+
+- The actions in the Effect Editor pane have been moved from the bottom
+  to the top of the window.
+
+- The Waterfall view is no longer clipped at the bottom.
+
+- WaveEdit Online has been updated to correctly import online waves
+  into a 64-frame bank.
+

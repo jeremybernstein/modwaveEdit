@@ -5,18 +5,54 @@
 #include <jansson.h>
 #include "imgui.h"
 
-
 static const char *api_host = "http://waveeditonline.com";
 
+#define DB_BANK_LEN 64
+#define DB_WAVE_LEN 256
 
 struct BankEntry {
+
+	BankEntry()
+		: samples{new float[DB_BANK_LEN * WAVE_LEN]()}
+	{}
+
+	~BankEntry() {
+		if (samples)
+			delete[] samples;
+	}
+
+  BankEntry(BankEntry&& be)
+		// : samples{be.samples}
+	{
+		*this = be;
+		be.samples = nullptr;
+	}
+
+  BankEntry& operator= (BankEntry&& be) {
+		if (this != &be) {
+			if (samples) {
+				delete[] samples;
+			}
+			*this = be;
+			// samples = be.samples;
+			be.samples = nullptr;
+		}
+		return *this;
+  }
+
 	std::string uuid;
 	std::string title;
 	std::string attribution;
 	std::string notes;
 	double datestamp;
-	float samples[BANK_LEN * WAVE_LEN];
+	float *samples;
 	bool loaded;
+
+private:
+
+  BankEntry(const BankEntry&) = default;
+  BankEntry& operator= (const BankEntry&) = default;
+
 };
 
 std::vector<BankEntry> bankEntries;
@@ -125,17 +161,27 @@ static void refresh() {
 					json_t *wavfilebase64J = json_object_get(entryJ, "wavfilebase64");
 					if (!wavfilebase64J) continue;
 					const char *wavfilebase64 = json_string_value(wavfilebase64J);
+
 					size_t samplesSize;
 					int16_t *samples = (int16_t*) base64_decode((unsigned char*) wavfilebase64, strlen(wavfilebase64), &samplesSize);
-					if (samplesSize != sizeof(int16_t) * BANK_LEN * WAVE_LEN) {
+					if (samplesSize != sizeof(int16_t) * DB_BANK_LEN * DB_WAVE_LEN) {
 						free(samples);
 						continue;
 					}
-					i16_to_f32(samples, bankEntry.samples, BANK_LEN * WAVE_LEN);
+					assert(BANK_LEN_MAX >= DB_BANK_LEN);
+					float *floatSamples = new float[DB_BANK_LEN * DB_WAVE_LEN];
+					i16_to_f32(samples, floatSamples, DB_BANK_LEN * DB_WAVE_LEN);
+					if (WAVE_LEN != DB_WAVE_LEN) {
+						resample(floatSamples, DB_BANK_LEN * DB_WAVE_LEN, bankEntry.samples, DB_BANK_LEN * WAVE_LEN, WAVE_LEN / DB_WAVE_LEN);
+					}
+					else {
+						memcpy(bankEntry.samples, floatSamples, sizeof(float) * DB_BANK_LEN * DB_WAVE_LEN);
+					}
+					delete[] floatSamples;
 					free(samples);
 
 					// Add bank entry to list
-					bankEntries.push_back(bankEntry);
+					bankEntries.push_back(std::move(bankEntry));
 				}
 			}
 			json_decref(root);
@@ -233,15 +279,24 @@ static void upload(std::string title, std::string attribution, std::string notes
 	json_t *notesJ = json_string(notes.c_str());
 	json_object_set_new(rootJ, "notes", notesJ);
 
+	assert(BANK_LEN_MAX >= DB_BANK_LEN);
 	// Get i16 samples
-	float *samples = new float[BANK_LEN * WAVE_LEN];
-	currentBank.getPostSamples(samples);
-	int16_t *samples_i16 = new int16_t[BANK_LEN * WAVE_LEN];
-	f32_to_i16(samples, samples_i16, BANK_LEN * WAVE_LEN);
+	float *bankSamples = new float[BANK_LEN_MAX * WAVE_LEN];
+	currentBank.getPostSamples(bankSamples);
+	float *samples = new float[DB_BANK_LEN * DB_WAVE_LEN];
+	if (WAVE_LEN != DB_WAVE_LEN) {
+		resample(bankSamples, BANK_LEN_MAX * WAVE_LEN, samples, DB_BANK_LEN * DB_WAVE_LEN, DB_WAVE_LEN / WAVE_LEN);
+	}
+	else {
+		memcpy(samples, bankSamples, sizeof(float) * DB_BANK_LEN * DB_WAVE_LEN);
+	}
+	int16_t *samples_i16 = new int16_t[DB_BANK_LEN * DB_WAVE_LEN];
+	f32_to_i16(samples, samples_i16, DB_BANK_LEN * DB_WAVE_LEN);
 	delete[] samples;
+	delete[] bankSamples;
 
 	// Get base64 samples
-	int samplesSize = sizeof(int16_t) * BANK_LEN * WAVE_LEN;
+	int samplesSize = sizeof(int16_t) * DB_BANK_LEN * DB_WAVE_LEN;
 	size_t wavfilebase64Size;
 	char *wavfilebase64 = (char*) base64_encode((unsigned char*) samples_i16, samplesSize, &wavfilebase64Size);
 	delete[] samples_i16;
@@ -382,7 +437,7 @@ void dbPage() {
 		else {
 			for (BankEntry &bankEntry : bankEntries) {
 				ImGui::PushID(bankEntry.uuid.c_str());
-				renderWave("", 140.0, NULL, 0, bankEntry.samples, BANK_LEN * WAVE_LEN, NO_TOOL);
+				renderWave("", 140.0, NULL, 0, bankEntry.samples, DB_BANK_LEN * WAVE_LEN, NO_TOOL);
 				ImGui::SameLine();
 				ImGui::BeginGroup();
 				{
@@ -398,7 +453,7 @@ void dbPage() {
 						bankEntryOther.loaded = false;
 					}
 					bankEntry.loaded = true;
-					currentBank.clear();
+					setGlobalBankLen(DB_BANK_LEN); // sets currentBank.bankLen
 					currentBank.setSamples(bankEntry.samples);
 					historyPush();
 				}
