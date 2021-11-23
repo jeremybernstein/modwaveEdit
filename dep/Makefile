@@ -3,13 +3,30 @@ LOCAL = $(PWD)
 
 include ../Makefile-arch.inc
 ifeq ($(ARCH),mac)
-	export CFLAGS = \
-		-mmacosx-version-min=10.11
+	ifneq ($(MAKELEVEL),0)
+		CFLAGS =
+		CXXFLAGS =
+		LDFLAGS =
+	endif
+	ifeq ($(BUILDARCH),universal)
+		CFLAGS += -arch x86_64 -arch arm64
+		LDFLAGS += -arch x86_64 -arch arm64
+		LOCAL = $(PWD)/build
+	else ifeq ($(BUILDARCH),arm64)
+		CFLAGS += -arch arm64
+		LDFLAGS += -arch arm64
+		LOCAL = $(PWD)/build_arm64
+	else
+		CFLAGS += -arch x86_64
+		LDFLAGS += -arch x86_64
+		LOCAL = $(PWD)/build_x86_64
+	endif
+	export CFLAGS += -mmacosx-version-min=10.11
 	export CXXFLAGS = $(CFLAGS)
 	export LDFLAGS = $(CFLAGS)
 endif
 
-sdl2 = SDL2-2.0.7
+sdl2 = SDL2-2.0.14
 jansson = jansson-2.10
 libsndfile = libsndfile-1.0.28
 libsamplerate = libsamplerate-0.1.9
@@ -19,7 +36,9 @@ libcurl = curl-7.54.1
 # This instance of make should be serialized, but -j flags are passed down to each recursive Makefile
 .NOTPARALLEL:
 
-all: $(sdl2) $(jansson) $(libsndfile) $(libsamplerate) $(libcurl)
+all: $(LOCAL)
+
+$(LOCAL) : $(sdl2) $(jansson) $(libsndfile) $(libsamplerate) $(libcurl)
 
 $(sdl2):
 	wget -nc https://www.libsdl.org/release/$@.tar.gz
@@ -50,7 +69,7 @@ $(libsamplerate):
 	$(MAKE) -C $@/src install
 
 $(libcurl):
-	wget https://curl.haxx.se/download/$@.tar.gz
+	wget -nc https://curl.haxx.se/download/$@.tar.gz
 	tar xf $@.tar.gz
 	cd $@ && ./configure --prefix="$(LOCAL)" \
 		--disable-ftp --disable-file --disable-ldap --disable-ldaps --disable-rtsp --disable-proxy --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-imap --disable-smb --disable-smtp --disable-gopher --disable-manual \
@@ -59,4 +78,9 @@ $(libcurl):
 	$(MAKE) -C $@ install
 
 clean:
-	git clean -fdx
+	rm -rf $(sdl2) $(jansson) $(libsndfile) $(libsamplerate) $(libcurl) $(LOCAL)/bin $(LOCAL)/include $(LOCAL)/lib $(LOCAL)/share
+
+ifeq ($(ARCH),mac)
+universal:
+	export BUILDARCH=universal && $(MAKE) clean && $(MAKE)
+endif

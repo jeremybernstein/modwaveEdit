@@ -1,3 +1,9 @@
+vMODWAVE_0.3
+============
+
+- added zoom factor for wave and harmonics views
+
+
 vMODWAVE_0.2
 ============
 

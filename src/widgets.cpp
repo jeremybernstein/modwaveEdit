@@ -154,20 +154,71 @@ static bool editorBehavior(ImGuiID id, const ImRect& box, const ImRect& inner, f
 	return false;
 }
 
+enum {
+	ZOOM_100 = 0,
+	ZOOM_200,
+	ZOOM_400,
+	ZOOM_800,
+	ZOOM_1600,
+	ZOOM_3200,
+};
+
+static int gWaveZoomLevel = ZOOM_100;
 
 bool renderWave(const char *name, float height, float *points, int pointsLen, const float *lines, int linesLen, enum Tool tool) {
 	ImGuiContext &g = *GImGui;
+	bool wed = false;
+
+	if (!strcmp(name, "WaveEditor")) {
+		wed = true;
+	}
+
+	ImGuiStyle& s = ImGui::GetStyle();
+
+	if (wed) {
+		ImGui::BeginGroup();
+
+		ImGui::BeginGroup();
+		if (ImGui::RadioButton("all##wave", gWaveZoomLevel == ZOOM_100)) gWaveZoomLevel = ZOOM_100;
+		if (ImGui::RadioButton("2x##wave", gWaveZoomLevel == ZOOM_200)) gWaveZoomLevel = ZOOM_200;
+		if (ImGui::RadioButton("4x##wave", gWaveZoomLevel == ZOOM_400)) gWaveZoomLevel = ZOOM_400;
+		if (ImGui::RadioButton("8x##wave", gWaveZoomLevel == ZOOM_800)) gWaveZoomLevel = ZOOM_800;
+		if (ImGui::RadioButton("16x##wave", gWaveZoomLevel == ZOOM_1600)) gWaveZoomLevel = ZOOM_1600;
+		if (ImGui::RadioButton("32x##wave", gWaveZoomLevel == ZOOM_3200)) gWaveZoomLevel = ZOOM_3200;
+		ImGui::EndGroup();
+
+		ImGui::SameLine();
+
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1, 1));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
+
+		// the version of imgui in use doesn't support horizontal mouse scrolling, which is a drag,
+		// but updating to the latest imgui is a big job which is going to take some time. in the interest
+		// of just getting something working, we'll cheat with some zoom & nav buttons
+		ImGui::BeginChild("##WaveRender", ImVec2(0, height + 1 + s.ScrollbarSize + (s.WindowPadding.y + s.FramePadding.y) * 2), true, ImGuiWindowFlags_HorizontalScrollbar);
+	}
+
 	ImGuiWindow *window = ImGui::GetCurrentWindow();
 	const ImGuiStyle &style = g.Style;
 	const ImGuiID id = window->GetID(name);
 
 	// Compute positions
-	ImVec2 size = ImVec2(ImGui::CalcItemWidth(), height);
-	ImRect box = ImRect(window->DC.CursorPos, window->DC.CursorPos + size);
+	ImVec2 pos = window->DC.CursorPos;
+	ImVec2 size = wed ? ImVec2((window->Size.x - ((s.WindowPadding.x + s.FramePadding.x) * 2)) * (1 << gWaveZoomLevel), height)
+										: ImVec2(ImGui::CalcItemWidth(), height);
+	ImRect box = wed ? ImRect(pos, pos + size)
+									 : ImRect(window->DC.CursorPos, window->DC.CursorPos + size);
 	ImRect inner = ImRect(box.Min + style.FramePadding, box.Max - style.FramePadding);
 	ImGui::ItemSize(box, style.FramePadding.y);
-	if (!ImGui::ItemAdd(box, NULL))
+	if (!ImGui::ItemAdd(box, NULL)) {
+		if (wed) {
+			ImGui::EndChild();
+			ImGui::PopStyleVar();
+			ImGui::PopStyleVar();
+			ImGui::EndGroup();
+		}
 		return false;
+	}
 
 	// Draw frame
 	ImGui::RenderFrame(box.Min, box.Max, ImGui::GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
@@ -213,24 +264,74 @@ bool renderWave(const char *name, float height, float *points, int pointsLen, co
 
 	ImGui::PopClipRect();
 
+	if (wed) {
+		ImGui::EndChild();
+
+		ImGui::PopStyleVar();
+		ImGui::PopStyleVar();
+
+		ImGui::EndGroup();
+	}
+
 	return edited;
 }
 
 
+static int gHistoZoomLevel = ZOOM_100;
+
 bool renderHistogram(const char *name, float height, float *bars, int barsLen, const float *ghost, int ghostLen, enum Tool tool) {
 	ImGuiContext &g = *GImGui;
+	bool hed = false;
+
+	if (!strcmp(name, "HarmonicEditor")) {
+		hed = true;
+	}
+
+	ImGuiStyle& s = ImGui::GetStyle();
+
+	if (hed) {
+		ImGui::BeginGroup();
+
+		ImGui::BeginGroup();
+		if (ImGui::RadioButton("all##histo", gHistoZoomLevel == ZOOM_100)) gHistoZoomLevel = ZOOM_100;
+		if (ImGui::RadioButton("2x##histo", gHistoZoomLevel == ZOOM_200)) gHistoZoomLevel = ZOOM_200;
+		if (ImGui::RadioButton("4x##histo", gHistoZoomLevel == ZOOM_400)) gHistoZoomLevel = ZOOM_400;
+		if (ImGui::RadioButton("8x##histo", gHistoZoomLevel == ZOOM_800)) gHistoZoomLevel = ZOOM_800;
+		if (ImGui::RadioButton("16x##histo", gHistoZoomLevel == ZOOM_1600)) gHistoZoomLevel = ZOOM_1600;
+		ImGui::EndGroup();
+
+		ImGui::SameLine();
+
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1, 1));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1));
+
+		// the version of imgui in use doesn't support horizontal mouse scrolling, which is a drag,
+		// but updating to the latest imgui is a big job which is going to take some time. in the interest
+		// of just getting something working, we'll cheat with some zoom & nav buttons
+		ImGui::BeginChild("##HistoRender", ImVec2(0, height + 1 + s.ScrollbarSize + (s.WindowPadding.y + s.FramePadding.y) * 2), true, ImGuiWindowFlags_HorizontalScrollbar);
+
+	}
 	ImGuiWindow *window = ImGui::GetCurrentWindow();
 	const ImGuiStyle &style = g.Style;
 	const ImGuiID id = window->GetID(name);
 
 	// Compute positions
 	ImVec2 pos = window->DC.CursorPos;
-	ImVec2 size = ImVec2(ImGui::CalcItemWidth(), height);
-	ImRect box = ImRect(pos, pos + size);
+	ImVec2 size = hed ? ImVec2((window->Size.x - ((s.WindowPadding.x + s.FramePadding.x) * 2)) * (1 << gHistoZoomLevel), height)
+										: ImVec2(ImGui::CalcItemWidth(), height);
+	ImRect box = hed ? ImRect(pos, pos + size)
+									 : ImRect(window->DC.CursorPos, window->DC.CursorPos + size);
 	ImRect inner = ImRect(box.Min + style.FramePadding, box.Max - style.FramePadding);
 	ImGui::ItemSize(box, style.FramePadding.y);
-	if (!ImGui::ItemAdd(box, NULL))
+	if (!ImGui::ItemAdd(box, NULL)) {
+		if (hed) {
+			ImGui::EndChild();
+			ImGui::PopStyleVar();
+			ImGui::PopStyleVar();
+			ImGui::EndGroup();
+		}
 		return false;
+	}
 
 	bool edited = editorBehavior(id, box, inner, bars, barsLen, -0.5, barsLen - 0.5, 1.0, 0.0, tool);
 
@@ -257,6 +358,15 @@ bool renderHistogram(const char *name, float height, float *bars, int barsLen, c
 	drawGrid(inner, barsLen);
 
 	ImGui::PopClipRect();
+
+	if (hed) {
+		ImGui::EndChild();
+
+		ImGui::PopStyleVar();
+		ImGui::PopStyleVar();
+
+		ImGui::EndGroup();
+	}
 
 	return edited;
 }

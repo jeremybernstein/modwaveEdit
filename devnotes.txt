@@ -1,0 +1,22 @@
+On Windows, when building curl, you'll need to comment out this
+section of (curl)/lib/select.h:
+
+#if !defined(HAVE_STRUCT_POLLFD) && \
+    !defined(HAVE_SYS_POLL_H) && \
+    !defined(HAVE_POLL_H)
+
+#define POLLIN      0x01
+#define POLLPRI     0x02
+#define POLLOUT     0x04
+#define POLLERR     0x08
+#define POLLHUP     0x10
+#define POLLNVAL    0x20
+
+struct pollfd
+{
+    curl_socket_t fd;
+    short   events;
+    short   revents;
+};
+
+#endif
