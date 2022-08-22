@@ -1,4 +1,4 @@
-VERSION = MODWAVE_0.3beta1
+VERSION = MODWAVE_0.3beta2
 
 FLAGS = -Wall -Wextra -Wno-unused-parameter -g -Wno-unused -O3 -ffast-math \
 	-DVERSION=$(VERSION) -DPFFFT_SIMD_DISABLE \
@@ -27,41 +27,43 @@ LIBDIR = $(DEP_PRODUCTS)/lib
 ifeq ($(ARCH),lin)
 	# Linux
 	FLAGS += -DARCH_LIN $(shell pkg-config --cflags gtk+-2.0)
-	LDFLAGS += -static-libstdc++ -static-libgcc \
+	c += -static-libstdc++ -static-libgcc \
 		-lGL -lpthread \
 		-L$(LIBDIR) -lSDL2 -lsamplerate -lsndfile -ljansson -lcurl \
 		-lgtk-x11-2.0 -lgobject-2.0
 	SOURCES += ext/osdialog/osdialog_gtk2.c
 else ifeq ($(ARCH),mac)
 	# Mac
-	ifeq ($(BUILDARCH),universal)
-		CFLAGS += -arch x86_64 -arch arm64
-		CXXFLAGS += -arch x86_64 -arch arm64
-		LDFLAGS += -arch x86_64 -arch arm64
-		DISTSUFFIX =
-		DEP_PRODUCTS = dep/build
-	else ifeq ($(BUILDARCH),arm64)
-		CFLAGS += -arch arm64
-		CXXFLAGS += -arch arm64
-		LDFLAGS += -arch arm64
-		DISTSUFFIX = _arm64
-		DEP_PRODUCTS = dep/build_arm64
-	else
-		CFLAGS += -arch x86_64
-		CXXFLAGS += -arch x86_64
-		LDFLAGS += -arch x86_64
-		DISTSUFFIX = _x86_64
-		DEP_PRODUCTS = dep/build_x86_64
+	ifneq ($(MAKECMDGOALS),universal)
+		ifeq ($(BUILDARCH),universal)
+			CFLAGS += -arch x86_64 -arch arm64
+			CXXFLAGS += -arch x86_64 -arch arm64
+			LDFLAGS += -arch x86_64 -arch arm64
+			DISTSUFFIX =
+			DEP_PRODUCTS = dep/build
+		else ifeq ($(BUILDARCH),arm64)
+			CFLAGS += -arch arm64
+			CXXFLAGS += -arch arm64
+			LDFLAGS += -arch arm64
+			DISTSUFFIX = _arm64
+			DEP_PRODUCTS = dep/build_arm64
+		else
+			CFLAGS += -arch x86_64
+			CXXFLAGS += -arch x86_64
+			LDFLAGS += -arch x86_64
+			DISTSUFFIX = _x86_64
+			DEP_PRODUCTS = dep/build_x86_64
+		endif
+		LIBDIR = $(DEP_PRODUCTS)/lib
+		FLAGS += -DARCH_MAC \
+			-mmacosx-version-min=10.11
+		CXXFLAGS += -stdlib=libc++
+		LDFLAGS += -mmacosx-version-min=10.11 \
+			-stdlib=libc++ -lpthread \
+			-framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo \
+			-L$(LIBDIR) -lSDL2 -lsamplerate -lsndfile -ljansson -lcurl
+		SOURCES += ext/osdialog/osdialog_mac.m
 	endif
-	LIBDIR = $(DEP_PRODUCTS)/lib
-	FLAGS += -DARCH_MAC \
-		-mmacosx-version-min=10.11
-	CXXFLAGS += -stdlib=libc++
-	LDFLAGS += -mmacosx-version-min=10.11 \
-		-stdlib=libc++ -lpthread \
-		-framework Cocoa -framework OpenGL -framework IOKit -framework CoreVideo \
-		-L$(LIBDIR) -lSDL2 -lsamplerate -lsndfile -ljansson -lcurl
-	SOURCES += ext/osdialog/osdialog_mac.m
 else ifeq ($(ARCH),win)
 	# Windows
 	FLAGS += -DARCH_WIN
@@ -160,6 +162,8 @@ build/%.cpp.o: %.cpp
 build/%.m.o: %.m
 	@mkdir -p $(@D)
 	$(CC) $(FLAGS) $(CFLAGS) -c -o $@ $<
+
+.PHONY: universal
 
 universal:
 	export BUILDARCH=universal && $(MAKE) clean && $(MAKE) && $(MAKE) dist
