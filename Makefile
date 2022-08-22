@@ -27,7 +27,7 @@ LIBDIR = $(DEP_PRODUCTS)/lib
 ifeq ($(ARCH),lin)
 	# Linux
 	FLAGS += -DARCH_LIN $(shell pkg-config --cflags gtk+-2.0)
-	c += -static-libstdc++ -static-libgcc \
+	LDFLAGS += -static-libstdc++ -static-libgcc \
 		-lGL -lpthread \
 		-L$(LIBDIR) -lSDL2 -lsamplerate -lsndfile -ljansson -lcurl \
 		-lgtk-x11-2.0 -lgobject-2.0
