@@ -166,6 +166,19 @@ static void menuOpenBank() {
 	free(dir);
 }
 
+static void menuOpenBankToFit() {
+	char *dir = getLastDir();
+	char *path = osdialog_file(OSDIALOG_OPEN, dir, NULL, NULL);
+	if (path) {
+		showCurrentBankPage();
+		currentBank.loadWAVToFit(path);
+		snprintf(lastFilename, sizeof(lastFilename), "%s", path);
+		historyPush();
+		free(path);
+	}
+	free(dir);
+}
+
 static void menuSaveBankAs() {
 	char *dir = getLastDir();
 	char *path = osdialog_file(OSDIALOG_SAVE, dir, "Untitled.wav", NULL);
@@ -247,6 +260,8 @@ static void menuKeyCommands() {
 			menuNewBank();
 		if (ImGui::IsKeyPressed(SDLK_o) && !io.KeyShift && !io.KeyAlt)
 			menuOpenBank();
+		if (ImGui::IsKeyPressed(SDLK_o) && io.KeyShift && !io.KeyAlt)
+			menuOpenBankToFit();
 		if (ImGui::IsKeyPressed(SDLK_s) && !io.KeyShift && !io.KeyAlt)
 			menuSaveBank();
 		if (ImGui::IsKeyPressed(SDLK_s) && io.KeyShift && !io.KeyAlt)
@@ -394,6 +409,8 @@ void renderMenu() {
 				menuNewBank();
 			if (ImGui::MenuItem("Open Bank...", ImGui::GetIO().OSXBehaviors ? "Cmd+O" : "Ctrl+O"))
 				menuOpenBank();
+			if (ImGui::MenuItem("Open Bank To Fit...", ImGui::GetIO().OSXBehaviors ? "Cmd+Shift+O" : "Ctrl+Shift+O"))
+				menuOpenBankToFit();
 			if (ImGui::MenuItem("Save Bank", ImGui::GetIO().OSXBehaviors ? "Cmd+S" : "Ctrl+S"))
 				menuSaveBank();
 			if (ImGui::MenuItem("Save Bank As...", ImGui::GetIO().OSXBehaviors ? "Cmd+Shift+S" : "Ctrl+Shift+S"))

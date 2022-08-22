@@ -122,17 +122,58 @@ void Bank::saveWAV(const char *filename) {
 void Bank::loadWAV(const char *filename) {
 	clear();
 
+	int newBankLen = 0;
 	SF_INFO info;
 	SNDFILE *sf = sf_open(filename, SFM_READ, &info);
 	if (!sf)
 		return;
 
 	for (int i = 0; i < getBankLen(); i++) {
-		sf_read_float(sf, waves[i].samples, WAVE_LEN);
-		waves[i].commitSamples();
+		sf_count_t readCount = sf_read_float(sf, waves[i].samples, WAVE_LEN);
+		if (readCount) {
+			waves[i].commitSamples();
+			newBankLen++;
+		}
+		if (readCount < WAVE_LEN) {
+			setGlobalBankLen(newBankLen);
+			break;
+		}
 	}
 
 	sf_close(sf);
+}
+
+
+void Bank::loadWAVToFit(const char *filename) {
+	clear();
+
+	SF_INFO info;
+	SNDFILE *sf = sf_open(filename, SFM_READ, &info);
+	if (!sf)
+		return;
+
+	int fileLength = info.frames * info.channels;
+	int bankLength = getBankLen() * WAVE_LEN;
+
+	if (fileLength == bankLength) {
+		sf_close(sf);
+		loadWAV(filename);
+		return;
+	}
+
+	float *fileSamples = new float[fileLength];
+	float *floatSamples = new float[bankLength];
+
+	sf_read_float(sf, fileSamples, fileLength);
+	resample(fileSamples, fileLength, floatSamples, bankLength, bankLength / fileLength);
+
+	for (int i = 0; i < getBankLen(); i++) {
+		memcpy(waves[i].samples, floatSamples + (i * WAVE_LEN), sizeof(float) * WAVE_LEN);
+		waves[i].commitSamples();
+	}
+
+	delete[] floatSamples;
+	delete[] fileSamples;
 }
 
 

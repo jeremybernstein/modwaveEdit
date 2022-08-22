@@ -213,6 +213,7 @@ struct Bank {
 	/** WAV file with BANK_LEN * WAVE_LEN samples */
 	void saveWAV(const char *filename);
 	void loadWAV(const char *filename);
+	void loadWAVToFit(const char *filename);
 	/** Saves each wave to its own file in a directory */
 	void saveWaves(const char *dirname);
 
