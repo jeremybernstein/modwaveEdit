@@ -1,4 +1,4 @@
-VERSION = MODWAVE_0.3beta2
+VERSION = MODWAVE_0.3beta3
 
 FLAGS = -Wall -Wextra -Wno-unused-parameter -g -Wno-unused -O3 -ffast-math \
 	-DVERSION=$(VERSION) -DPFFFT_SIMD_DISABLE \

@@ -162,17 +162,17 @@ void Bank::loadWAVToFit(const char *filename) {
 	}
 
 	float *fileSamples = new float[fileLength];
-	float *floatSamples = new float[bankLength];
+	float *bankSamples = new float[bankLength];
 
 	sf_read_float(sf, fileSamples, fileLength);
-	resample(fileSamples, fileLength, floatSamples, bankLength, bankLength / fileLength);
+	resample(fileSamples, fileLength, bankSamples, bankLength, (double)bankLength / (double)fileLength);
 
 	for (int i = 0; i < getBankLen(); i++) {
-		memcpy(waves[i].samples, floatSamples + (i * WAVE_LEN), sizeof(float) * WAVE_LEN);
+		memcpy(waves[i].samples, bankSamples + (i * WAVE_LEN), sizeof(float) * WAVE_LEN);
 		waves[i].commitSamples();
 	}
 
-	delete[] floatSamples;
+	delete[] bankSamples;
 	delete[] fileSamples;
 }
 
